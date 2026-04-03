@@ -154,13 +154,3 @@ make test
 docker build -t financial-data-mcp .
 docker run --rm -p 8000:8000 financial-data-mcp
 ```
-
-## GitHub Topics Checklist
-
-Add these repository topics in GitHub settings:
-
-- `mcp`
-- `ai-agents`
-- `finance`
-- `fastapi`
-- `llm-tools`
