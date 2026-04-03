@@ -35,13 +35,16 @@ def financial_insights(
     start_date: str | None = None,
     end_date: str | None = None,
     min_amount: float | None = None,
+    session_id: str = "default",
 ) -> dict:
     errors: list[dict] = []
     summary: dict | None = None
     anomalies: dict | None = None
 
     try:
-        summary = spending_summary(start_date=start_date, end_date=end_date)
+        summary = spending_summary(
+            start_date=start_date, end_date=end_date, session_id=session_id
+        )
     except IngestionRequiredError:
         logger.warning("Insights summary requires ingestion.")
         errors.append(
@@ -67,6 +70,7 @@ def financial_insights(
             start_date=start_date,
             end_date=end_date,
             min_amount=min_amount,
+            session_id=session_id,
         )
     except IngestionRequiredError:
         logger.warning("Insights anomaly detection requires ingestion.")

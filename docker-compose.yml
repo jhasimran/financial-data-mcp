@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  orchestrator-api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - FRONTEND_ORIGINS=http://localhost:3000
+    ports:
+      - "8000:8000"
+
+  mcp-server:
+    build: .
+    command: python -m app.main
+    stdin_open: true
+    tty: true
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    environment:
+      - NEXT_PUBLIC_ORCHESTRATOR_URL=http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - orchestrator-api

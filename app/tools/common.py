@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from copy import deepcopy
+from uuid import uuid4
 
 class ExternalAPIError(RuntimeError):
     """Raised when an upstream public API fails."""
@@ -36,28 +37,45 @@ class IngestionRequiredError(ValueError):
 
 
 class InMemoryTransactionStore:
-    """Process-local store for sanitized ingested transactions."""
+    """Process-local store for sanitized ingested transactions per session."""
 
     def __init__(self) -> None:
-        self._transactions: list[dict] = []
-        self._metadata: dict = {"sources": 0, "warnings": []}
+        self._transactions: dict[str, list[dict]] = {}
+        self._metadata: dict[str, dict] = {}
 
-    def has_data(self) -> bool:
-        return len(self._transactions) > 0
+    def create_session(self) -> str:
+        session_id = str(uuid4())
+        self._transactions[session_id] = []
+        self._metadata[session_id] = {"sources": 0, "warnings": []}
+        return session_id
 
-    def set(self, transactions: list[dict], sources: int, warnings: list[str]) -> None:
-        self._transactions = deepcopy(transactions)
-        self._metadata = {"sources": sources, "warnings": list(warnings)}
+    def has_session(self, session_id: str) -> bool:
+        return session_id in self._transactions
 
-    def get_transactions(self) -> list[dict]:
-        return deepcopy(self._transactions)
+    def has_data(self, session_id: str) -> bool:
+        return len(self._transactions.get(session_id, [])) > 0
 
-    def get_metadata(self) -> dict:
-        return deepcopy(self._metadata)
+    def set(
+        self, session_id: str, transactions: list[dict], sources: int, warnings: list[str]
+    ) -> None:
+        if not self.has_session(session_id):
+            self.create_with_id(session_id)
+        self._transactions[session_id] = deepcopy(transactions)
+        self._metadata[session_id] = {"sources": sources, "warnings": list(warnings)}
 
-    def clear(self) -> None:
-        self._transactions = []
-        self._metadata = {"sources": 0, "warnings": []}
+    def create_with_id(self, session_id: str) -> None:
+        self._transactions[session_id] = []
+        self._metadata[session_id] = {"sources": 0, "warnings": []}
+
+    def get_transactions(self, session_id: str) -> list[dict]:
+        return deepcopy(self._transactions.get(session_id, []))
+
+    def get_metadata(self, session_id: str) -> dict:
+        return deepcopy(self._metadata.get(session_id, {"sources": 0, "warnings": []}))
+
+    def clear(self, session_id: str) -> None:
+        self._transactions[session_id] = []
+        self._metadata[session_id] = {"sources": 0, "warnings": []}
 
 
 TRANSACTION_STORE = InMemoryTransactionStore()

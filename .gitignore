@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Ui
+ui/node_modules/
+
 # C extensions
 *.so
 

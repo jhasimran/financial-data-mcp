@@ -1,211 +1,167 @@
-# Financial Data MCP Server
+# Financial Data MCP Platform
 
 ![Python](https://img.shields.io/badge/python-3.10-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-Plug financial data (FX, crypto, transactions, stock quotes) into AI agents via MCP tools.
+Privacy-first financial intelligence platform with:
+- MCP tool server
+- Python orchestration API (upload + Q&A)
+- Separate Next.js web app
 
-## Why this MCP server?
+## Architecture
 
-AI agents often cannot directly access finance-specific APIs or normalize financial data formats safely.
-This project provides plug-and-play MCP tools so agents can fetch prices, analyze spending, and generate actionable financial signals with one consistent interface.
+```mermaid
+flowchart LR
+  user[UserBrowser] --> ui[NextJsUI]
+  ui --> api[PythonOrchestratorAPI]
+  api --> tools[FinanceTooling]
+  tools --> ingest[PDFIngestionAndSanitization]
+  tools --> analytics[SummaryAnomalyInsights]
+  mcp[MCPServerStdio] --> tools
+```
 
-## Use Cases
+## Why this project exists
 
-- AI financial assistant for monthly check-ins
-- Budget analyzer with category-level spend insights
-- Crypto tracker for live market prices
-- Personal spending anomaly detector
+Financial statements are hard to use with AI safely. This project turns PDFs into sanitized transactions and lets users ask practical budget questions without persisting raw PII.
 
-## Tools
+## Features
 
-1. `convert_currency`
-2. `get_crypto_price`
-3. `list_transactions`
-4. `get_spending_summary`
-5. `flag_anomalies`
-6. `financial_insights` (composite)
-7. `get_stock_quote`
-8. `ingest_financial_documents` (privacy-first PDF ingestion)
+- Privacy-first PDF ingestion (`ingest_financial_documents`)
+- Session-scoped in-memory transaction state (no cross-user mixing)
+- Composite insights tool (`financial_insights`)
+- Q&A orchestration API for frontend apps
+- Currency, crypto, and stock tools
 
-## Tech Stack
+## Core Tools
 
-- Python
-- MCP Python SDK
-- FastAPI (health endpoint)
-- Public APIs:
-  - ExchangeRate API: `https://open.er-api.com/v6/latest/{BASE}`
-  - CoinGecko Simple Price: `https://api.coingecko.com/api/v3/simple/price`
-  - Alpha Vantage Global Quote: `https://www.alphavantage.co/query`
+1. `ingest_financial_documents`
+2. `list_transactions`
+3. `get_spending_summary`
+4. `flag_anomalies`
+5. `financial_insights`
+6. `convert_currency`
+7. `get_crypto_price`
+8. `get_stock_quote`
 
-## Project Layout
+## Repository Layout
 
-- `app/main.py` - MCP tool registration and app bootstrap
-- `app/tools/currency.py` - FX conversion with cache/logging
-- `app/tools/crypto.py` - crypto quote lookup with cache/logging
-- `app/tools/transactions.py` - seeded transaction analysis
-- `app/tools/insights.py` - composite spending + anomaly insights
-- `app/tools/stock.py` - stock quote integration
-- `app/tools/ingestion.py` - PDF parser + transaction sanitizer
-- `examples/agent_demo.py` - demo agent-like workflow
-- `tests/` - baseline and composite tests
+- `app/main.py` - MCP registration + FastAPI app bootstrap
+- `app/api/orchestrator.py` - upload/chat/session API routes
+- `app/api/schemas.py` - response/request contracts
+- `app/tools/ingestion.py` - PDF extraction + sanitization
+- `app/tools/transactions.py` - analytics over ingested session data
+- `app/tools/insights.py` - composite summary + anomaly interpretation
+- `ui/` - production Next.js web app
+- `tests/` - backend unit/API tests
 
-## Quickstart (1-min setup)
+## Quickstart
+
+### 1) Backend
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[test]"
-make test
+pytest
 ```
 
-## Run
-
-### Start MCP server (stdio transport)
+Run orchestration API:
 
 ```bash
-make run
+uvicorn app.main:app --reload
 ```
 
-### Start FastAPI dev server
+### 2) Frontend
 
 ```bash
-make dev
+cd ui
+npm install
+npm run dev
 ```
 
-Health check:
+Frontend default URL: `http://localhost:3000`
+Backend default URL: `http://localhost:8000`
 
-```bash
-curl http://127.0.0.1:8000/health
+## Orchestration API Endpoints
+
+### `POST /api/session`
+Create a new user session.
+
+Response:
+
+```json
+{"session_id":"<uuid>"}
 ```
 
-## Example Agent Demo
+### `GET /api/session/{session_id}/status`
+Inspect whether a session has ingested data.
 
-```bash
-python examples/agent_demo.py
-```
+### `POST /api/documents/ingest?session_id=<uuid>`
+Multipart upload endpoint for statement PDFs.
 
-## Ingestion-first Flow
-
-Transaction analytics tools now require a prior ingestion step in the current server session.
-
-1. Call `ingest_financial_documents` with one or more PDF statement paths.
-2. Use `list_transactions`, `get_spending_summary`, `flag_anomalies`, or `financial_insights`.
-
-If ingestion has not been run, these tools return:
+Response:
 
 ```json
 {
-  "ok": false,
-  "error": "No ingested transactions available. Run ingest_financial_documents first.",
-  "source": "ingestion",
-  "type": "ingestion_required"
+  "session_id":"<uuid>",
+  "count":42,
+  "sources":2,
+  "warnings":[]
 }
 ```
 
-## Example Output
+### `POST /api/chat`
 
-```text
-=== Financial Insights Demo ===
-Period: {'start_date': '2026-03-01', 'end_date': '2026-03-31'}
-
-Summary:
-{'currency': 'USD',
- 'period': {'end_date': '2026-03-31', 'start_date': '2026-03-01'},
- 'total_spend': 4791.05,
- 'totals_by_category': {'education': 179.0, 'entertainment': 17.0, 'food': 266.12, ...},
- 'transaction_count': 18}
-
-Anomalies:
-{'anomalies': [...], 'baseline': {'mad': 41.7, 'median': 57.65}, 'count': 3}
-
-Insights:
-1. 3 unusual transaction(s) detected. Review spikes for one-off or avoidable spend.
-```
-
-![Agent demo output](docs/images/agent-demo-output.svg)
-
-## Tool I/O Examples
-
-### `financial_insights` (composite)
-
-Request args:
-
-```json
-{"start_date":"2026-03-01","end_date":"2026-03-31","min_amount":50}
-```
-
-Response shape:
+Request:
 
 ```json
 {
-  "ok": true,
-  "period": {"start_date":"2026-03-01","end_date":"2026-03-31"},
-  "summary": {"total_spend":4791.05,"currency":"USD","totals_by_category":{"food":266.12}},
-  "anomalies": {"count":3,"anomalies":[{"merchant":"Airline Co","amount":1280.0}]},
-  "insights": ["3 unusual transaction(s) detected. Review spikes for one-off or avoidable spend."],
-  "errors": []
+  "session_id":"<uuid>",
+  "question":"What are my top spending categories?"
 }
 ```
 
-### `ingest_financial_documents`
-
-Request args:
-
-```json
-{"file_paths":["/absolute/path/statement1.pdf","/absolute/path/statement2.pdf"]}
-```
-
-Response shape:
+Response:
 
 ```json
 {
-  "transactions": [
-    {
-      "id": "ingested_doc1_1",
-      "date": "2026-03-21",
-      "merchant": "Starbucks",
-      "category": "food",
-      "amount": 5.67,
-      "currency": "USD",
-      "direction": "debit"
-    }
-  ],
-  "count": 1,
-  "sources": 2,
-  "warnings": []
-}
-```
-
-### Error shape (all tools)
-
-```json
-{
-  "ok": false,
-  "error": "Failed to fetch crypto price",
-  "source": "coingecko",
-  "type": "upstream_error"
+  "session_id":"<uuid>",
+  "answer":"Total spending in the selected data is 1234.56 USD.",
+  "tool_calls":["get_spending_summary"],
+  "supporting_data":{},
+  "warnings":[]
 }
 ```
 
 ## Privacy Guarantees
 
-- Raw PDF text is processed ephemerally and is not persisted.
-- Only sanitized transaction fields are retained for analytics.
-- Account numbers, emails, and address-like patterns are redacted during ingestion.
-- Logs do not include raw document content.
+- Raw PDF text is processed ephemerally and never persisted.
+- Only sanitized fields are retained: date, amount, merchant, category, currency, direction.
+- Sanitization removes long numeric strings, emails, and address-like patterns.
+- Logs avoid raw document content.
 
-## Developer Commands
+## Error Contract
 
-```bash
-make run
-make dev
-make test
+```json
+{
+  "ok": false,
+  "error": "No ingested transactions available. Upload PDFs first.",
+  "source": "orchestrator"
+}
 ```
 
-## Docker
+## Environment Variables
+
+- `FRONTEND_ORIGINS` (backend CORS, comma-separated)
+- `NEXT_PUBLIC_ORCHESTRATOR_URL` (frontend API base URL)
+
+## Docker Compose (3 services)
 
 ```bash
-docker build -t financial-data-mcp .
-docker run --rm -p 8000:8000 financial-data-mcp
+docker compose up --build
 ```
+
+Services:
+- `orchestrator-api` on `:8000`
+- `ui` on `:3000`
+- `mcp-server` (stdio MCP process)

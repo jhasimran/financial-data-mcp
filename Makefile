@@ -4,5 +4,14 @@ run:
 dev:
 	uvicorn app.main:app --reload
 
+mcp:
+	python -m app.main
+
+orchestrator:
+	uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+ui:
+	cd ui && npm run dev
+
 test:
 	pytest

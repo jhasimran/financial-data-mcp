@@ -1,6 +1,10 @@
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from mcp.server.fastmcp import FastMCP
 
+from app.api.orchestrator import router as orchestrator_router
 from app.tools.common import (
     ExternalAPIError,
     IngestionRequiredError,
@@ -25,6 +29,20 @@ APP_NAME = "financial-data-mcp"
 app = FastAPI(title=APP_NAME)
 mcp = FastMCP(APP_NAME)
 logger = get_logger(__name__)
+
+origins = [
+    origin.strip()
+    for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(orchestrator_router)
 
 
 def _run_tool(tool_name: str, fn, source: str) -> dict:
