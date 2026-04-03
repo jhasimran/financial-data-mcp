@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from copy import deepcopy
 
 class ExternalAPIError(RuntimeError):
     """Raised when an upstream public API fails."""
@@ -28,6 +29,38 @@ def error_payload(error: str, source: str, error_type: str = "tool_error") -> di
         "source": source,
         "type": error_type,
     }
+
+
+class IngestionRequiredError(ValueError):
+    """Raised when transaction tools are used before document ingestion."""
+
+
+class InMemoryTransactionStore:
+    """Process-local store for sanitized ingested transactions."""
+
+    def __init__(self) -> None:
+        self._transactions: list[dict] = []
+        self._metadata: dict = {"sources": 0, "warnings": []}
+
+    def has_data(self) -> bool:
+        return len(self._transactions) > 0
+
+    def set(self, transactions: list[dict], sources: int, warnings: list[str]) -> None:
+        self._transactions = deepcopy(transactions)
+        self._metadata = {"sources": sources, "warnings": list(warnings)}
+
+    def get_transactions(self) -> list[dict]:
+        return deepcopy(self._transactions)
+
+    def get_metadata(self) -> dict:
+        return deepcopy(self._metadata)
+
+    def clear(self) -> None:
+        self._transactions = []
+        self._metadata = {"sources": 0, "warnings": []}
+
+
+TRANSACTION_STORE = InMemoryTransactionStore()
 
 
 class TTLCache:

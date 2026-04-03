@@ -26,6 +26,7 @@ This project provides plug-and-play MCP tools so agents can fetch prices, analyz
 5. `flag_anomalies`
 6. `financial_insights` (composite)
 7. `get_stock_quote`
+8. `ingest_financial_documents` (privacy-first PDF ingestion)
 
 ## Tech Stack
 
@@ -45,7 +46,7 @@ This project provides plug-and-play MCP tools so agents can fetch prices, analyz
 - `app/tools/transactions.py` - seeded transaction analysis
 - `app/tools/insights.py` - composite spending + anomaly insights
 - `app/tools/stock.py` - stock quote integration
-- `app/data/transactions_seed.json` - local mock transaction dataset
+- `app/tools/ingestion.py` - PDF parser + transaction sanitizer
 - `examples/agent_demo.py` - demo agent-like workflow
 - `tests/` - baseline and composite tests
 
@@ -82,6 +83,24 @@ curl http://127.0.0.1:8000/health
 
 ```bash
 python examples/agent_demo.py
+```
+
+## Ingestion-first Flow
+
+Transaction analytics tools now require a prior ingestion step in the current server session.
+
+1. Call `ingest_financial_documents` with one or more PDF statement paths.
+2. Use `list_transactions`, `get_spending_summary`, `flag_anomalies`, or `financial_insights`.
+
+If ingestion has not been run, these tools return:
+
+```json
+{
+  "ok": false,
+  "error": "No ingested transactions available. Run ingest_financial_documents first.",
+  "source": "ingestion",
+  "type": "ingestion_required"
+}
 ```
 
 ## Example Output
@@ -129,6 +148,35 @@ Response shape:
 }
 ```
 
+### `ingest_financial_documents`
+
+Request args:
+
+```json
+{"file_paths":["/absolute/path/statement1.pdf","/absolute/path/statement2.pdf"]}
+```
+
+Response shape:
+
+```json
+{
+  "transactions": [
+    {
+      "id": "ingested_doc1_1",
+      "date": "2026-03-21",
+      "merchant": "Starbucks",
+      "category": "food",
+      "amount": 5.67,
+      "currency": "USD",
+      "direction": "debit"
+    }
+  ],
+  "count": 1,
+  "sources": 2,
+  "warnings": []
+}
+```
+
 ### Error shape (all tools)
 
 ```json
@@ -139,6 +187,13 @@ Response shape:
   "type": "upstream_error"
 }
 ```
+
+## Privacy Guarantees
+
+- Raw PDF text is processed ephemerally and is not persisted.
+- Only sanitized transaction fields are retained for analytics.
+- Account numbers, emails, and address-like patterns are redacted during ingestion.
+- Logs do not include raw document content.
 
 ## Developer Commands
 

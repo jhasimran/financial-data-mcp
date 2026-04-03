@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
 from datetime import date
-from pathlib import Path
 from statistics import median
 
-DATA_FILE = Path(__file__).resolve().parents[1] / "data" / "transactions_seed.json"
+from app.tools.common import IngestionRequiredError, TRANSACTION_STORE
 
 
 def _parse_iso_date(raw_date: str, field_name: str) -> date:
@@ -15,9 +13,23 @@ def _parse_iso_date(raw_date: str, field_name: str) -> date:
         raise ValueError(f"{field_name} must be YYYY-MM-DD.") from exc
 
 
+def set_ingested_transactions(
+    transactions: list[dict], sources: int, warnings: list[str]
+) -> None:
+    TRANSACTION_STORE.set(transactions=transactions, sources=sources, warnings=warnings)
+
+
+def clear_ingested_transactions() -> None:
+    TRANSACTION_STORE.clear()
+
+
 def _load_transactions() -> list[dict]:
-    with DATA_FILE.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    records = TRANSACTION_STORE.get_transactions()
+    if not records:
+        raise IngestionRequiredError(
+            "No ingested transactions found. Call ingest_financial_documents first."
+        )
+    return records
 
 
 def _filter_transactions(

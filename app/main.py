@@ -1,12 +1,19 @@
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 
-from app.tools.common import ExternalAPIError, error_payload, get_logger
+from app.tools.common import (
+    ExternalAPIError,
+    IngestionRequiredError,
+    error_payload,
+    get_logger,
+)
 from app.tools.crypto import get_crypto_price_data
 from app.tools.currency import convert_currency_value
+from app.tools.ingestion import ingest_financial_documents
 from app.tools.insights import financial_insights
 from app.tools.stock import get_stock_quote
 from app.tools.transactions import (
+    set_ingested_transactions,
     flag_transaction_anomalies,
     list_seed_transactions,
     spending_summary,
@@ -23,20 +30,31 @@ logger = get_logger(__name__)
 def _run_tool(tool_name: str, fn, source: str) -> dict:
     try:
         return fn()
+    except IngestionRequiredError:
+        logger.warning("Ingestion required for tool=%s", tool_name)
+        return error_payload(
+            "No ingested transactions available. Run ingest_financial_documents first.",
+            source="ingestion",
+            error_type="ingestion_required",
+        )
     except ValueError as exc:
-        logger.warning("Validation error in %s: %s", tool_name, exc)
-        return error_payload(str(exc), source=source, error_type="validation_error")
+        logger.warning("Validation error in tool=%s", tool_name)
+        return error_payload(
+            str(exc),
+            source=source,
+            error_type="validation_error",
+        )
     except ExternalAPIError as exc:
-        logger.error("External API error in %s: %s", tool_name, exc)
+        logger.error("External API error in tool=%s source=%s", tool_name, source)
         return error_payload(
             str(exc),
             source=getattr(exc, "source", source),
             error_type="upstream_error",
         )
-    except Exception as exc:
-        logger.exception("Unhandled error in %s", tool_name)
+    except Exception:
+        logger.exception("Unhandled error in tool=%s", tool_name)
         return error_payload(
-            f"Unexpected error in {tool_name}: {exc}",
+            f"Unexpected failure in {tool_name}.",
             source=source,
             error_type="internal_error",
         )
@@ -140,6 +158,24 @@ def get_stock_price(symbol: str, api_key: str | None = None) -> dict:
         "get_stock_quote",
         lambda: get_stock_quote(symbol=symbol, api_key=api_key),
         source="alphavantage",
+    )
+
+
+@mcp.tool(name="ingest_financial_documents")
+def ingest_documents(file_paths: list[str]) -> dict:
+    def _ingest() -> dict:
+        result = ingest_financial_documents(file_paths=file_paths)
+        set_ingested_transactions(
+            transactions=result["transactions"],
+            sources=result["sources"],
+            warnings=result["warnings"],
+        )
+        return result
+
+    return _run_tool(
+        "ingest_financial_documents",
+        _ingest,
+        source="ingestion",
     )
 
 

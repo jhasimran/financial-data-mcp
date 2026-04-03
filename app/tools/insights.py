@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.tools.common import ExternalAPIError, get_logger
+from app.tools.common import ExternalAPIError, IngestionRequiredError, get_logger
 from app.tools.transactions import flag_transaction_anomalies, spending_summary
 
 logger = get_logger(__name__)
@@ -42,10 +42,25 @@ def financial_insights(
 
     try:
         summary = spending_summary(start_date=start_date, end_date=end_date)
+    except IngestionRequiredError:
+        logger.warning("Insights summary requires ingestion.")
+        errors.append(
+            {
+                "component": "summary",
+                "error": "No ingested transactions available. Run ingest_financial_documents first.",
+                "source": "ingestion",
+            }
+        )
     except (ValueError, ExternalAPIError) as exc:
         logger.exception("Failed to compute spending summary")
         source = getattr(exc, "source", "transactions")
-        errors.append({"component": "summary", "error": str(exc), "source": source})
+        errors.append(
+            {
+                "component": "summary",
+                "error": "Unable to compute spending summary.",
+                "source": source,
+            }
+        )
 
     try:
         anomalies = flag_transaction_anomalies(
@@ -53,10 +68,25 @@ def financial_insights(
             end_date=end_date,
             min_amount=min_amount,
         )
+    except IngestionRequiredError:
+        logger.warning("Insights anomaly detection requires ingestion.")
+        errors.append(
+            {
+                "component": "anomalies",
+                "error": "No ingested transactions available. Run ingest_financial_documents first.",
+                "source": "ingestion",
+            }
+        )
     except (ValueError, ExternalAPIError) as exc:
         logger.exception("Failed to compute anomalies")
         source = getattr(exc, "source", "transactions")
-        errors.append({"component": "anomalies", "error": str(exc), "source": source})
+        errors.append(
+            {
+                "component": "anomalies",
+                "error": "Unable to compute anomalies.",
+                "source": source,
+            }
+        )
 
     return {
         "ok": len(errors) == 0,

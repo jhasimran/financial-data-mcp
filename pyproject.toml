@@ -12,6 +12,7 @@ dependencies = [
   "fastapi",
   "httpx",
   "mcp",
+  "pdfplumber",
   "pydantic",
   "uvicorn[standard]",
 ]

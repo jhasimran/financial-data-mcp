@@ -1,6 +1,7 @@
 fastapi
 httpx
 mcp
+pdfplumber
 pydantic
 uvicorn[standard]
 pytest

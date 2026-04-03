@@ -1,9 +1,35 @@
 import pytest
 
 from app.tools.insights import financial_insights
+from app.tools.transactions import clear_ingested_transactions, set_ingested_transactions
 
 
 def test_financial_insights_happy_path() -> None:
+    clear_ingested_transactions()
+    set_ingested_transactions(
+        [
+            {
+                "id": "tx_1",
+                "date": "2026-03-01",
+                "merchant": "Landlord LLC",
+                "category": "rent",
+                "amount": 1600.0,
+                "currency": "USD",
+                "direction": "debit",
+            },
+            {
+                "id": "tx_2",
+                "date": "2026-03-02",
+                "merchant": "Fresh Mart",
+                "category": "food",
+                "amount": 75.0,
+                "currency": "USD",
+                "direction": "debit",
+            },
+        ],
+        sources=1,
+        warnings=[],
+    )
     result = financial_insights(start_date="2026-03-01", end_date="2026-03-31")
     assert result["summary"] is not None
     assert result["anomalies"] is not None
@@ -55,3 +81,13 @@ def test_financial_insights_partial_result(monkeypatch: pytest.MonkeyPatch) -> N
     assert result["anomalies"] is not None
     assert result["ok"] is False
     assert result["errors"][0]["component"] == "summary"
+
+
+def test_financial_insights_requires_ingestion() -> None:
+    clear_ingested_transactions()
+    result = financial_insights()
+    assert result["ok"] is False
+    assert result["summary"] is None
+    assert result["anomalies"] is None
+    assert len(result["errors"]) == 2
+    assert all(item["source"] == "ingestion" for item in result["errors"])
