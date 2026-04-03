@@ -28,6 +28,7 @@ def test_get_crypto_price_success(monkeypatch: pytest.MonkeyPatch) -> None:
         "vs_currency": "usd",
         "price": 45321.17,
         "source": "coingecko.com",
+        "cache_hit": False,
     }
 
 
@@ -43,4 +44,4 @@ def test_get_crypto_price_upstream_failure(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr("app.tools.crypto.httpx.get", fake_get)
 
     with pytest.raises(ExternalAPIError, match="status code 429"):
-        get_crypto_price_data("bitcoin", "usd")
+        get_crypto_price_data("ethereum", "usd")

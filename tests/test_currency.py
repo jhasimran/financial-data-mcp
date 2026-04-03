@@ -35,6 +35,7 @@ def test_convert_currency_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["rate_date"] == "2026-03-31"
     assert result["from_currency"] == "USD"
     assert result["to_currency"] == "EUR"
+    assert result["cache_hit"] is False
 
 
 def test_convert_currency_invalid_currency() -> None:
@@ -49,4 +50,4 @@ def test_convert_currency_upstream_failure(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr("app.tools.currency.httpx.get", fake_get)
 
     with pytest.raises(ExternalAPIError, match="status code 503"):
-        convert_currency_value("USD", "EUR", 100)
+        convert_currency_value("GBP", "EUR", 100)
