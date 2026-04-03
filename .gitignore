@@ -5,6 +5,7 @@ __pycache__/
 
 # Ui
 ui/node_modules/
+ui/.next/
 
 # C extensions
 *.so
