@@ -1,5 +1,8 @@
 fastapi
 httpx
+langchain-anthropic
+langchain-core
+langgraph
 mcp
 pdfplumber
 pydantic

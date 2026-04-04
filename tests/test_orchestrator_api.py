@@ -62,6 +62,104 @@ def test_chat_returns_answer_after_ingestion() -> None:
     assert "get_spending_summary" in payload["tool_calls"]
 
 
+def test_chat_returns_budget_plan_after_ingestion() -> None:
+    session_id = client.post("/api/session").json()["session_id"]
+    set_ingested_transactions(
+        [
+            {
+                "id": "t1",
+                "date": "2026-02-01",
+                "merchant": "Landlord LLC",
+                "category": "rent",
+                "amount": 1600.0,
+                "currency": "USD",
+                "direction": "debit",
+            },
+            {
+                "id": "t2",
+                "date": "2026-03-01",
+                "merchant": "Landlord LLC",
+                "category": "rent",
+                "amount": 1600.0,
+                "currency": "USD",
+                "direction": "debit",
+            },
+            {
+                "id": "t3",
+                "date": "2026-03-09",
+                "merchant": "Movies",
+                "category": "entertainment",
+                "amount": 220.0,
+                "currency": "USD",
+                "direction": "debit",
+            },
+        ],
+        sources=1,
+        warnings=[],
+        session_id=session_id,
+    )
+    response = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "question": "How can I save 200 this month?"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert "plan_savings" in payload["tool_calls"]
+    assert "plan_savings" in payload["supporting_data"]
+    assert payload["answer"]
+
+
+def test_chat_capability_query_returns_help_text(monkeypatch) -> None:
+    monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
+    session_id = client.post("/api/session").json()["session_id"]
+    response = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "question": "what can you do for me?"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tool_calls"] == []
+    assert "ingest PDF statements" in payload["answer"]
+
+
+def test_chat_spending_categories_answer_includes_category_name(monkeypatch) -> None:
+    monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
+    session_id = client.post("/api/session").json()["session_id"]
+    set_ingested_transactions(
+        [
+            {
+                "id": "t1",
+                "date": "2026-02-01",
+                "merchant": "Landlord LLC",
+                "category": "rent",
+                "amount": 1600.0,
+                "currency": "USD",
+                "direction": "debit",
+            },
+            {
+                "id": "t2",
+                "date": "2026-02-05",
+                "merchant": "Fresh Mart",
+                "category": "food",
+                "amount": 300.0,
+                "currency": "USD",
+                "direction": "debit",
+            },
+        ],
+        sources=1,
+        warnings=[],
+        session_id=session_id,
+    )
+    response = client.post(
+        "/api/chat",
+        json={"session_id": session_id, "question": "what are my top spending categories?"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert "get_spending_summary" in payload["tool_calls"]
+    assert "rent" in payload["answer"].lower() or "food" in payload["answer"].lower()
+
+
 def test_ingest_endpoint(monkeypatch, tmp_path: Path) -> None:
     session_id = client.post("/api/session").json()["session_id"]
 

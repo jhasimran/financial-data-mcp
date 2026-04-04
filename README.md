@@ -5,7 +5,7 @@
 
 Privacy-first financial intelligence platform with:
 - MCP tool server
-- Python orchestration API (upload + Q&A)
+- Python orchestration API (upload + Q&A via LangGraph)
 - Separate Next.js web app
 
 ## Architecture
@@ -14,7 +14,8 @@ Privacy-first financial intelligence platform with:
 flowchart LR
   user[UserBrowser] --> ui[NextJsUI]
   ui --> api[PythonOrchestratorAPI]
-  api --> tools[FinanceTooling]
+  api --> graph[LangGraphAgent]
+  graph --> tools[FinanceTooling]
   tools --> ingest[PDFIngestionAndSanitization]
   tools --> analytics[SummaryAnomalyInsights]
   mcp[MCPServerStdio] --> tools
@@ -29,6 +30,7 @@ Financial statements are hard to use with AI safely. This project turns PDFs int
 - Privacy-first PDF ingestion (`ingest_financial_documents`)
 - Session-scoped in-memory transaction state (no cross-user mixing)
 - Composite insights tool (`financial_insights`)
+- Budget planner capability for savings targets and max-savings estimation
 - Q&A orchestration API for frontend apps
 - Currency, crypto, and stock tools
 
@@ -43,11 +45,30 @@ Financial statements are hard to use with AI safely. This project turns PDFs int
 7. `get_crypto_price`
 8. `get_stock_quote`
 
+## Budget Planning Capability
+
+The LangGraph orchestrator includes an internal deterministic tool (`plan_savings`) for savings planning.
+
+- It analyzes ingested historical debit transactions by month and category.
+- It estimates `max_savings_estimate` with category-specific cut ceilings.
+- It evaluates savings target feasibility (`target_met`) when a target is provided.
+- It returns category-level recommendations and assumptions in `supporting_data`.
+
+Sample prompts:
+- "How can I save 300 this month?"
+- "What is the max savings I can do this month?"
+- "Plan savings aggressively for a 500 target."
+
+Notes:
+- This capability is API/LangGraph only (not directly MCP-exposed yet).
+- It requires ingested transaction history first.
+
 ## Repository Layout
 
 - `app/main.py` - MCP registration + FastAPI app bootstrap
 - `app/api/orchestrator.py` - upload/chat/session API routes
 - `app/api/schemas.py` - response/request contracts
+- `app/agent/` - LangGraph state, prompts, nodes, graph, and runner
 - `app/tools/ingestion.py` - PDF extraction + sanitization
 - `app/tools/transactions.py` - analytics over ingested session data
 - `app/tools/insights.py` - composite summary + anomaly interpretation
@@ -84,6 +105,14 @@ Backend default URL: `http://localhost:8000`
 
 ## Orchestration API Endpoints
 
+The `POST /api/chat` endpoint now uses a LangGraph workflow:
+- session validation
+- ingestion guardrails
+- Anthropic planning (with deterministic local fallback)
+- iterative tool execution
+- answer composition
+- privacy safety filtering
+
 ### `POST /api/session`
 Create a new user session.
 
@@ -109,6 +138,10 @@ Response:
   "warnings":[]
 }
 ```
+
+Budget-planning questions return the same response schema and include planner output under:
+- `tool_calls`: contains `plan_savings`
+- `supporting_data.plan_savings`: deterministic planning payload (estimate, recommendations, warnings)
 
 ### `POST /api/chat`
 
@@ -153,6 +186,9 @@ Response:
 ## Environment Variables
 
 - `FRONTEND_ORIGINS` (backend CORS, comma-separated)
+- `ANTHROPIC_API_KEY` (required for Anthropic-powered planning/composition)
+- `LANGGRAPH_ANTHROPIC_MODEL` (optional model override; default `claude-3-5-sonnet-latest`)
+- `LANGGRAPH_MAX_STEPS` (optional orchestration step cap; default `4`)
 - `NEXT_PUBLIC_ORCHESTRATOR_URL` (frontend API base URL)
 
 ## Docker Compose (3 services)

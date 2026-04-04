@@ -9,34 +9,163 @@ body {
   color: #e2e8f0;
 }
 
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 2rem 1rem 3rem;
-}
-
-.card {
-  background: #111827;
-  border: 1px solid #1f2937;
-  border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
+button,
 input,
 textarea,
-button {
+summary {
   font: inherit;
 }
 
-input,
-textarea {
+.chat-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 1rem 1rem 1.25rem;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.8rem;
+}
+
+.chat-header {
+  border: 1px solid #1f2937;
+  background: #111827;
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+}
+
+.chat-header h1 {
+  margin: 0 0 0.2rem;
+  font-size: 1.15rem;
+}
+
+.chat-header p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.chat-thread {
+  border: 1px solid #1f2937;
+  background: #0b1220;
+  border-radius: 12px;
+  padding: 0.9rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-height: 52vh;
+}
+
+.message {
+  max-width: min(78ch, 88%);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 0.65rem 0.8rem;
+}
+
+.message-user {
+  margin-left: auto;
+  background: #1d4ed8;
+  border-color: #2563eb;
+}
+
+.message-assistant {
+  margin-right: auto;
+  background: #111827;
+}
+
+.message-system {
+  margin: 0 auto;
+  background: #172554;
+  border-color: #1d4ed8;
+}
+
+.message-error {
+  margin: 0 auto;
+  background: #3f1d1d;
+  border-color: #7f1d1d;
+}
+
+.message-text {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.message-meta {
+  margin-top: 0.4rem;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.message-attachments,
+.pending-attachments {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.attachment-chip {
+  border: 1px solid #334155;
+  background: #111827;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.attachment-chip.removable {
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.supporting-data {
+  margin-top: 0.45rem;
+}
+
+.supporting-data pre {
+  margin: 0.5rem 0 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 0.7rem;
+  border-radius: 8px;
+  background: #020617;
+  border: 1px solid #1e293b;
+  font-size: 0.78rem;
+}
+
+.composer {
+  border: 1px solid #1f2937;
+  background: #111827;
+  border-radius: 12px;
+  padding: 0.75rem;
+  position: sticky;
+  bottom: 0.75rem;
+}
+
+.composer-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem;
+  align-items: end;
+}
+
+.composer textarea {
   width: 100%;
+  resize: vertical;
+  min-height: 52px;
+  max-height: 180px;
   background: #0b1220;
   border: 1px solid #334155;
   color: #e2e8f0;
-  border-radius: 8px;
-  padding: 0.7rem;
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+}
+
+.icon-button {
+  white-space: nowrap;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
 }
 
 button {

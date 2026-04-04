@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from app.agent.run import run_langgraph_chat
 from app.api.schemas import (
     ChatRequest,
     ChatResponse,
@@ -14,8 +15,7 @@ from app.api.schemas import (
 )
 from app.tools.common import TRANSACTION_STORE, get_logger
 from app.tools.ingestion import ingest_financial_documents
-from app.tools.insights import financial_insights
-from app.tools.transactions import list_seed_transactions, set_ingested_transactions, spending_summary
+from app.tools.transactions import set_ingested_transactions
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api", tags=["orchestrator"])
@@ -93,56 +93,25 @@ async def ingest_documents(session_id: str, files: list[UploadFile] = File(...))
                 logger.warning("Temporary file cleanup failed for session=%s", session_id)
 
 
-def _orchestrate_question(session_id: str, question: str) -> tuple[list[str], dict, str, list[str]]:
-    q = question.lower()
-    warnings: list[str] = []
-    tool_calls: list[str] = []
-    supporting_data: dict = {}
-
-    if any(k in q for k in ("summary", "spend", "budget", "category")):
-        tool_calls.append("get_spending_summary")
-        supporting_data["summary"] = spending_summary(session_id=session_id)
-
-    if any(k in q for k in ("anomaly", "unusual", "spike", "insight", "risk")):
-        tool_calls.append("financial_insights")
-        supporting_data["insights"] = financial_insights(session_id=session_id)
-
-    if any(k in q for k in ("list", "transaction", "recent")) or not tool_calls:
-        tool_calls.append("list_transactions")
-        supporting_data["transactions"] = list_seed_transactions(limit=20, session_id=session_id)
-
-    if "insights" in supporting_data:
-        insight_lines = supporting_data["insights"].get("insights", [])
-        answer = " ".join(insight_lines) if insight_lines else "No major signals found."
-    elif "summary" in supporting_data:
-        total = supporting_data["summary"].get("total_spend")
-        answer = f"Total spending in the selected data is {total} USD."
-    else:
-        count = supporting_data.get("transactions", {}).get("count", 0)
-        answer = f"I found {count} transactions in your ingested documents."
-
-    return tool_calls, supporting_data, answer, warnings
-
-
 @router.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
     _ensure_session(request.session_id)
-    if not TRANSACTION_STORE.has_data(request.session_id):
-        raise _safe_tool_error(
-            "No ingested transactions available. Upload PDFs first.",
-            code=400,
-        )
 
     try:
-        tool_calls, supporting_data, answer, warnings = _orchestrate_question(
-            request.session_id, request.question
-        )
+        result = run_langgraph_chat(request.session_id, request.question)
+        if result.get("status") == "needs_ingestion":
+            raise _safe_tool_error(
+                "No ingested transactions available. Upload PDFs first.",
+                code=400,
+            )
+        if result.get("status") == "error":
+            raise _safe_tool_error(result.get("error_message") or "Failed to process chat request.", code=500)
         return ChatResponse(
             session_id=request.session_id,
-            answer=answer,
-            tool_calls=tool_calls,
-            supporting_data=supporting_data,
-            warnings=warnings,
+            answer=result["answer"],
+            tool_calls=result["tool_calls"],
+            supporting_data=result["supporting_data"],
+            warnings=result["warnings"],
         )
     except HTTPException:
         raise
