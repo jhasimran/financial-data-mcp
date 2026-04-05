@@ -14,16 +14,8 @@ You can use this repository in two ways:
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  userNode[UserBrowser] --> uiNode[NextJsUI]
-  uiNode --> apiNode[PythonOrchestratorAPI]
-  apiNode --> langGraphNode[LangGraphAgent]
-  langGraphNode --> toolsNode[FinanceTooling]
-  toolsNode --> ingestNode[PDFIngestionAndSanitization]
-  toolsNode --> analyticsNode[SummaryAnomalyInsights]
-  mcpNode[MCPServerStdio] --> toolsNode
-```
+<img width="1024" height="1536" alt="System Architecture" src="https://github.com/user-attachments/assets/dfd3786d-7c69-4fc1-b45d-19a75b72273f" />
+
 
 ## Why this project exists
 
@@ -181,16 +173,8 @@ Backend default URL: `http://localhost:8000`
 
 The repo has two main runtime surfaces built on top of the same finance tool layer:
 
-```mermaid
-flowchart TD
-  userClientNode[UserOrToolClient] -->|"MCP stdio"| mcpServerNode[MCPServer]
-  userClientNode -->|"HTTP"| apiServerNode[FastAPIOrchestrator]
-  apiServerNode --> langGraphAgentNode[LangGraphAgent]
-  mcpServerNode --> toolLayerNode[SharedFinanceTools]
-  langGraphAgentNode --> toolLayerNode
-  toolLayerNode --> ingestionPipelineNode[PDFIngestionAndSanitization]
-  toolLayerNode --> transactionAnalyticsNode[TransactionsInsightsBudgeting]
-```
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/83b4d8f6-a483-446c-8919-d53a1d744a81" />
+
 
 - The `MCP server` is the direct tool surface.
 - The `LangGraph agent` is the higher-level orchestration layer.
