@@ -16,13 +16,13 @@ You can use this repository in two ways:
 
 ```mermaid
 flowchart LR
-  user[UserBrowser] --> ui[NextJsUI]
-  ui --> api[PythonOrchestratorAPI]
-  api --> graph[LangGraphAgent]
-  graph --> tools[FinanceTooling]
-  tools --> ingest[PDFIngestionAndSanitization]
-  tools --> analytics[SummaryAnomalyInsights]
-  mcp[MCPServerStdio] --> tools
+  userNode[UserBrowser] --> uiNode[NextJsUI]
+  uiNode --> apiNode[PythonOrchestratorAPI]
+  apiNode --> langGraphNode[LangGraphAgent]
+  langGraphNode --> toolsNode[FinanceTooling]
+  toolsNode --> ingestNode[PDFIngestionAndSanitization]
+  toolsNode --> analyticsNode[SummaryAnomalyInsights]
+  mcpNode[MCPServerStdio] --> toolsNode
 ```
 
 ## Why this project exists
@@ -183,13 +183,13 @@ The repo has two main runtime surfaces built on top of the same finance tool lay
 
 ```mermaid
 flowchart TD
-  userClient[UserOrToolClient] -->|"MCP stdio"| mcpServer[MCPServer]
-  userClient -->|"HTTP"| apiServer[FastAPIOrchestrator]
-  apiServer --> langgraphAgent[LangGraphAgent]
-  mcpServer --> toolLayer[SharedFinanceTools]
-  langgraphAgent --> toolLayer
-  toolLayer --> ingestionPipeline[PDFIngestionAndSanitization]
-  toolLayer --> transactionAnalytics[TransactionsInsightsBudgeting]
+  userClientNode[UserOrToolClient] -->|"MCP stdio"| mcpServerNode[MCPServer]
+  userClientNode -->|"HTTP"| apiServerNode[FastAPIOrchestrator]
+  apiServerNode --> langGraphAgentNode[LangGraphAgent]
+  mcpServerNode --> toolLayerNode[SharedFinanceTools]
+  langGraphAgentNode --> toolLayerNode
+  toolLayerNode --> ingestionPipelineNode[PDFIngestionAndSanitization]
+  toolLayerNode --> transactionAnalyticsNode[TransactionsInsightsBudgeting]
 ```
 
 - The `MCP server` is the direct tool surface.
