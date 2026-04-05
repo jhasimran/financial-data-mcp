@@ -120,7 +120,25 @@ pip install -e ".[test]"
 pytest
 ```
 
-### 2) Run the MCP server
+### 2) Create a real local env file
+
+`.env.example` is only a template. It is not loaded automatically by `uvicorn`, and values inside it do not become environment variables unless you explicitly load them.
+
+Create a real local `.env` file first:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and set your real Anthropic key:
+
+```bash
+ANTHROPIC_API_KEY=your-real-key
+```
+
+If you do not provide `ANTHROPIC_API_KEY`, the LangGraph agent still runs, but planning and answer composition fall back to deterministic logic instead of Anthropic responses.
+
+### 3) Run the MCP server
 
 This runs the stdio MCP server for MCP-compatible clients:
 
@@ -128,7 +146,7 @@ This runs the stdio MCP server for MCP-compatible clients:
 python -m app.main
 ```
 
-### 3) Run the LangGraph orchestration API
+### 4) Run the LangGraph orchestration API
 
 This runs the FastAPI app that powers the attachment-aware chat flow:
 
@@ -136,7 +154,19 @@ This runs the FastAPI app that powers the attachment-aware chat flow:
 uvicorn app.main:app --reload
 ```
 
-### 4) Run the frontend
+If you want `uvicorn` to load values from your local `.env` file automatically, run:
+
+```bash
+uvicorn app.main:app --env-file .env --reload
+```
+
+Or use:
+
+```bash
+make orchestrator-env
+```
+
+### 5) Run the frontend
 
 ```bash
 cd ui

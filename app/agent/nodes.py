@@ -74,6 +74,7 @@ def _capability_answer() -> str:
 
 def _anthropic_chat(system_prompt: str, user_prompt: str) -> str | None:
     api_key = os.getenv("ANTHROPIC_API_KEY")
+    logger.info("ANTHROPIC_API_KEY present: %s", bool(api_key))
     if not api_key:
         return None
 
