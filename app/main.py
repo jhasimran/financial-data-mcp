@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mcp.server.fastmcp import FastMCP
 
 from app.api.orchestrator import router as orchestrator_router
+from app.tools.budget_planner import plan_savings
 from app.tools.common import (
     ExternalAPIError,
     IngestionRequiredError,
@@ -167,6 +168,22 @@ def get_financial_insights(
             min_amount=min_amount,
         ),
         source="insights",
+    )
+
+
+@mcp.tool(name="plan_savings")
+def get_savings_plan(
+    target_amount: float | None = None,
+    strategy: str = "balanced",
+) -> dict:
+    return _run_tool(
+        "plan_savings",
+        lambda: plan_savings(
+            session_id="default",
+            target_amount=target_amount,
+            strategy=strategy,
+        ),
+        source="budget_planner",
     )
 
 

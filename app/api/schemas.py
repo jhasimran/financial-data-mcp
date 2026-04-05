@@ -23,12 +23,14 @@ class IngestResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     session_id: str
-    question: str = Field(min_length=1)
+    question: str | None = Field(default=None)
 
 
 class ChatResponse(BaseModel):
     session_id: str
+    status: str
     answer: str
     tool_calls: list[str]
     supporting_data: dict
     warnings: list[str]
+    missing_input: str | None = None

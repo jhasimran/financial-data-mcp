@@ -10,13 +10,18 @@ class PlannedToolCall(TypedDict):
 
 class AgentState(TypedDict):
     session_id: str
-    user_question: str
-    status: Literal["running", "error", "needs_ingestion", "done"]
+    user_message: str
+    status: Literal["running", "error", "needs_input", "done"]
+    missing_input: str | None
     error_message: str
-    plan: list[PlannedToolCall]
+    error_messages: list[str]
+    attachments_present: bool
+    attachment_paths: list[str]
+    parsed_transactions: list[dict[str, Any]]
+    tool_plan: list[PlannedToolCall]
     next_step: int
     tool_calls: list[str]
-    supporting_data: dict[str, Any]
+    tool_outputs: dict[str, Any]
     warnings: list[str]
     answer: str
     has_transaction_data: bool

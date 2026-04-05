@@ -10,22 +10,21 @@ Return strict JSON with this shape:
 }
 
 Allowed tools:
-- ingest_financial_documents(file_paths: list[str])
 - list_transactions(start_date?: str, end_date?: str, category?: str, limit?: int)
 - get_spending_summary(start_date?: str, end_date?: str)
 - flag_anomalies(start_date?: str, end_date?: str, min_amount?: float)
 - financial_insights(start_date?: str, end_date?: str, min_amount?: float)
 - plan_savings(target_amount?: float, strategy?: str)
-- convert_currency(from_currency: str, to_currency: str, amount: float)
-- get_crypto_price(asset: str, vs_currency?: str)
-- get_stock_quote(symbol: str, api_key?: str)
 
 Rules:
 - Never include tools outside this list.
-- For broad budgeting questions, prefer financial_insights.
+- The user already has transaction context before planning.
+- You may return multiple tools when the question asks for multiple kinds of analysis.
+- For top spending or category questions, include get_spending_summary.
+- For unusual spending questions, include flag_anomalies.
+- For broader narrative insight questions, prefer financial_insights.
 - For savings goal or budget planning queries, prefer plan_savings.
 - For drill-down transaction questions, include list_transactions.
-- Do not include ingest_financial_documents for chat unless the user explicitly asks to ingest by path.
 - Keep plan <= 4 steps.
 - Return only JSON and no markdown.
 """

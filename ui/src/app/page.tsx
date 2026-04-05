@@ -10,10 +10,12 @@ import {
 } from "react";
 
 type ChatResult = {
+  status: "done" | "needs_input" | "error";
   answer: string;
   tool_calls: string[];
   supporting_data: Record<string, unknown>;
   warnings: string[];
+  missing_input?: string | null;
 };
 
 type MessageRole = "user" | "assistant" | "system" | "error";
@@ -37,7 +39,6 @@ export default function HomePage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [isIngesting, setIsIngesting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -148,73 +149,44 @@ export default function HomePage() {
     ]);
 
     setIsSending(true);
-    let shouldContinueToChat = Boolean(text);
 
     try {
-      if (hasFiles) {
-        setIsIngesting(true);
-        const formData = new FormData();
-        for (const file of pendingFiles) {
-          formData.append("files", file);
-        }
-
-        const ingestResponse = await fetch(
-          `${API_BASE}/api/documents/ingest?session_id=${encodeURIComponent(sessionId)}`,
-          { method: "POST", body: formData }
-        );
-        const ingestPayload = await ingestResponse.json();
-        if (!ingestResponse.ok) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              role: "error",
-              text: ingestPayload?.detail?.error ?? "Failed to ingest attached PDFs.",
-            },
-          ]);
-          shouldContinueToChat = false;
-        } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              role: "system",
-              text: `Ingested ${ingestPayload.count} transactions from ${ingestPayload.sources} file(s).`,
-            },
-          ]);
-        }
+      const formData = new FormData();
+      formData.append("session_id", sessionId);
+      formData.append("question", text);
+      for (const file of pendingFiles) {
+        formData.append("files", file);
       }
 
-      if (shouldContinueToChat) {
-        const chatResponse = await fetch(`${API_BASE}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId, question: text }),
-        });
-        const chatPayload = await chatResponse.json();
-        if (!chatResponse.ok) {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              role: "error",
-              text: chatPayload?.detail?.error ?? "Failed to process your question.",
-            },
-          ]);
-        } else {
-          const result = chatPayload as ChatResult;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              role: "assistant",
-              text: result.answer,
-              toolCalls: result.tool_calls,
-              supportingData: result.supporting_data,
-              warnings: result.warnings,
-            },
-          ]);
-        }
+      const chatResponse = await fetch(`${API_BASE}/api/chat`, {
+        method: "POST",
+        body: formData,
+      });
+      const chatPayload = await chatResponse.json();
+      if (!chatResponse.ok) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "error",
+            text: chatPayload?.detail?.error ?? "Failed to process your request.",
+          },
+        ]);
+      } else {
+        const result = chatPayload as ChatResult;
+        const role: MessageRole =
+          result.status === "needs_input" ? "system" : "assistant";
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role,
+            text: result.answer,
+            toolCalls: result.tool_calls,
+            supportingData: result.supporting_data,
+            warnings: result.warnings,
+          },
+        ]);
       }
     } catch {
       setMessages((prev) => [
@@ -229,7 +201,6 @@ export default function HomePage() {
       setComposerText("");
       setPendingFiles([]);
       setIsSending(false);
-      setIsIngesting(false);
     }
   };
 
@@ -326,7 +297,7 @@ export default function HomePage() {
             type="submit"
             disabled={isSending || (!composerText.trim() && pendingFiles.length === 0)}
           >
-            {isIngesting ? "Uploading..." : isSending ? "Sending..." : "Send"}
+            {isSending ? "Sending..." : "Send"}
           </button>
         </div>
       </form>

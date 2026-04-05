@@ -5,41 +5,35 @@ import re
 from app.agent.run import run_langgraph_chat
 from app.tools.common import TRANSACTION_STORE
 from app.tools.transactions import set_ingested_transactions
+from tests.helpers import create_session, fake_ingest_result
 
 
-def _create_session() -> str:
-    return TRANSACTION_STORE.create_session()
-
-
-def test_langgraph_requires_ingestion_for_transaction_queries() -> None:
-    session_id = _create_session()
+def test_langgraph_requires_transactions_for_analysis() -> None:
+    session_id = create_session()
     result = run_langgraph_chat(session_id=session_id, question="show my spending summary")
-    assert result["status"] == "needs_ingestion"
-    assert "Upload PDFs first" in result["answer"]
+    assert result["status"] == "needs_input"
+    assert result["missing_input"] == "transactions"
+    assert "upload" in result["answer"].lower()
 
 
-def test_langgraph_allows_market_queries_without_ingestion(monkeypatch) -> None:
-    session_id = _create_session()
+def test_langgraph_ingests_attachments_inside_graph(monkeypatch) -> None:
+    session_id = create_session()
+    monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
+    monkeypatch.setattr("app.agent.nodes.ingest_financial_documents", lambda **_: fake_ingest_result())
 
-    def fake_execute_tool(name: str, args: dict, session_id: str) -> dict:
-        assert name == "get_crypto_price"
-        return {
-            "asset": "bitcoin",
-            "vs_currency": "usd",
-            "price": 12345.67,
-            "source": "coingecko.com",
-            "cache_hit": True,
-        }
-
-    monkeypatch.setattr("app.agent.nodes.execute_tool", fake_execute_tool)
-    result = run_langgraph_chat(session_id=session_id, question="what is bitcoin price now?")
+    result = run_langgraph_chat(
+        session_id=session_id,
+        question="what are my top spending categories?",
+        attachment_paths=["/tmp/statement.pdf"],
+    )
     assert result["status"] == "done"
-    assert "get_crypto_price" in result["tool_calls"]
-    assert result["answer"]
+    assert "get_spending_summary" in result["tool_calls"]
+    assert "get_spending_summary" in result["supporting_data"]
+    assert TRANSACTION_STORE.has_data(session_id) is True
 
 
 def test_langgraph_redacts_sensitive_tokens_in_supporting_data() -> None:
-    session_id = _create_session()
+    session_id = create_session()
     set_ingested_transactions(
         transactions=[
             {
@@ -63,9 +57,23 @@ def test_langgraph_redacts_sensitive_tokens_in_supporting_data() -> None:
     assert "[redacted-email]" in payload
 
 
+def test_langgraph_attachment_only_returns_follow_up_prompt(monkeypatch) -> None:
+    session_id = create_session()
+    monkeypatch.setattr("app.agent.nodes.ingest_financial_documents", lambda **_: fake_ingest_result())
+
+    result = run_langgraph_chat(
+        session_id=session_id,
+        question="",
+        attachment_paths=["/tmp/statement.pdf"],
+    )
+    assert result["status"] == "needs_input"
+    assert result["missing_input"] == "question"
+    assert "what would you like me to analyze next" in result["answer"].lower()
+
+
 def test_langgraph_session_isolation() -> None:
-    session_with_data = _create_session()
-    session_without_data = _create_session()
+    session_with_data = create_session()
+    session_without_data = create_session()
     set_ingested_transactions(
         transactions=[
             {
@@ -87,11 +95,12 @@ def test_langgraph_session_isolation() -> None:
     empty_result = run_langgraph_chat(session_id=session_without_data, question="show summary")
 
     assert ok_result["status"] == "done"
-    assert empty_result["status"] == "needs_ingestion"
+    assert empty_result["status"] == "needs_input"
 
 
-def test_langgraph_routes_savings_target_queries_to_budget_planner() -> None:
-    session_id = _create_session()
+def test_langgraph_routes_savings_target_queries_to_budget_planner(monkeypatch) -> None:
+    session_id = create_session()
+    monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
     set_ingested_transactions(
         transactions=[
             {
@@ -136,8 +145,9 @@ def test_langgraph_routes_savings_target_queries_to_budget_planner() -> None:
     assert "plan_savings" in result["supporting_data"]
 
 
-def test_langgraph_routes_max_savings_queries_to_budget_planner() -> None:
-    session_id = _create_session()
+def test_langgraph_multi_tool_plan_runs_multiple_transaction_tools(monkeypatch) -> None:
+    session_id = create_session()
+    monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
     set_ingested_transactions(
         transactions=[
             {
@@ -166,25 +176,16 @@ def test_langgraph_routes_max_savings_queries_to_budget_planner() -> None:
 
     result = run_langgraph_chat(
         session_id=session_id,
-        question="What is the max savings I can do this month?",
+        question="Summarize my spending and flag unusual transactions",
     )
     assert result["status"] == "done"
-    assert "plan_savings" in result["tool_calls"]
+    assert "get_spending_summary" in result["tool_calls"]
+    assert "flag_anomalies" in result["tool_calls"]
     assert result["answer"]
 
 
-def test_langgraph_capability_query_returns_help_without_tools(monkeypatch) -> None:
-    session_id = _create_session()
-    monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
-
-    result = run_langgraph_chat(session_id=session_id, question="what can you do for me?")
-    assert result["status"] == "done"
-    assert result["tool_calls"] == []
-    assert "ingest PDF statements" in result["answer"]
-
-
 def test_langgraph_spending_categories_answer_includes_category_names(monkeypatch) -> None:
-    session_id = _create_session()
+    session_id = create_session()
     monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
     set_ingested_transactions(
         transactions=[
@@ -219,7 +220,7 @@ def test_langgraph_spending_categories_answer_includes_category_names(monkeypatc
 
 
 def test_langgraph_savings_answer_includes_recommendation_detail(monkeypatch) -> None:
-    session_id = _create_session()
+    session_id = create_session()
     monkeypatch.setattr("app.agent.nodes._anthropic_chat", lambda *_: None)
     set_ingested_transactions(
         transactions=[
